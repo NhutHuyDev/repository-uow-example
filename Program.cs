@@ -4,6 +4,8 @@ using repository_uow_example.Entities;
 using repository_uow_example.Repositories;
 using repository_uow_example.Repositories.InMemory;
 using repository_uow_example.Repositories.SqlServer;
+using repository_uow_example.UnitOfWork.SqlServer;
+using RepositorySample.OrderReferenceGenerators;
 
 namespace repository_uow_example
 {
@@ -32,6 +34,8 @@ namespace repository_uow_example
                 QueryProducts(productRepository);
 
                 trans.Commit();
+
+                CreateOrders(sqlConnection);
             }
             else
             {
@@ -108,6 +112,50 @@ namespace repository_uow_example
                 Console.WriteLine($"| {product.Id,-36} | {product.Name,-40} | {product.Price,-10:C} |");
             }
             Console.WriteLine(new string('-', 95) + "\n");
+        }
+
+        private static void CreateOrders(SqlConnection sqlConnection)
+        {
+            var referenceGenerator = new RandomStringOrderReferenceGenerator();
+            var uow = new CheckoutUnitOfWork(sqlConnection);
+            var orderId = Guid.NewGuid();
+
+            try
+            {
+                uow.CreateOrder(new Order()
+                {
+                    OrderReference = referenceGenerator.Next(10),
+                    CustomerId = Guid.Empty,
+                    Id = orderId,
+                    Items = [
+                        new OrderItem()
+                        {
+                            Id = Guid.NewGuid(),
+                            OrderId = orderId,
+                            Price = 999,
+                            ProductId = new Guid("00000000-0000-0000-0000-000000000001"),
+                            Quantity = 1
+                        },
+                        new OrderItem()
+                        {
+                            Id = Guid.NewGuid(),
+                            OrderId = orderId,
+                            Price = 999,
+                            ProductId = new Guid("00000000-0000-0000-0000-000000000002"),
+                            Quantity = 1
+                        }
+                    ]
+                });
+
+                uow.SaveChanges();
+            }
+            catch {
+                uow.Rollback(); 
+            }
+            finally
+            {
+                uow.Dispose();
+            }
         }
     }
 }
